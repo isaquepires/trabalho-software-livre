@@ -13,9 +13,12 @@
 # You should have received a copy of the GNU General Public License 
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# preparando o nome dos arquivos
-todo="tarefas-todo.txt"
-done="tarefas-done.txt"
+# preparando a variável de ambiente para definir um diretório padrão
+TAREFAS_DIR="${TAREFAS_DIR:-.}"
+
+# definindo o nome e caminho para os arquivos
+todo="$TAREFAS_DIR/tarefas-todo.txt"
+done="$TAREFAS_DIR/tarefas-done.txt"
 
 # uma espécie de template para organizar todos os identificadores nas linhas
 montar_tarefa() {
@@ -28,12 +31,15 @@ montar_tarefa() {
 
     # adiciona tarefa com data limite e prioridade (a prioridade padrão é 1)
     if [ -n "$prio" ]; then
+      [[ $prio =~ ^[1-9][0-9]*$ ]] || die "defina a prioridade a partir de 1 (padrão)."
+
       echo "$id: \"$tarefa\" ($deadline +$prio)"
     else
       echo "$id: \"$tarefa\" ($deadline)"
     fi
   # adiciona tarefa somente com prioridade e por fim, adiciona somente a tarefa
   elif [ -n "$prio" ]; then
+    [[ $prio =~ ^[1-9][0-9]*$ ]] || die "defina a prioridade a partir de 1 (padrão)."
     echo "$id: \"$tarefa\" (+$prio)"
   else
     echo "$id: \"$tarefa\""
@@ -111,7 +117,7 @@ list() {
 edit()
 {
   # trata do caso de a tarefa não existir na lista
-  grep -q "^$id_busca:" "$todo" || die "Esta tarefa não existe..."
+  grep -q "^$id_busca:" "$todo" || die "esta tarefa não existe..."
   
   # pega exatamente o nome da tarefa para colocá-lo na linha
   tarefa=$(grep "^$id_busca:" "$todo" | sed -E 's/^[^"]*"([^"]*)".*$/\1/')
@@ -127,7 +133,7 @@ edit()
 remover_linha()
 {
   # pela passagem do arquivo, apaga a linha desejada através do id
-  arquivo="$1" && grep -q "^$id_busca" "$arquivo" || die "Esta tarefa não existe..."
+  arquivo="$1" && grep -q "^$id_busca" "$arquivo" || die "esta tarefa não existe..."
   sed -i "0,/^$id_busca/{/^$id_busca/d}" "$arquivo"
 }
 
@@ -149,7 +155,7 @@ do_tarefa()
   linha=$(grep "^$id_busca:" "$todo")
   
   # tratando o erros para a inexistência da tarefa buscada
-  [ -n "$linha" ] || die "Esta tarefa não existe..."
+  [ -n "$linha" ] || die "esta tarefa não existe..."
   
   # "movendo" tarefa para a lista de realizadas com data e hora
   echo "$linha realizada em $(date +"%Y%m%d %H%M")." >> "$done"
@@ -185,18 +191,47 @@ salvar_identificadores()
 	done
 }
 
-uso()
-{
-  echo "USO..."
-}
-
-# encontra id referente a tarefa
+# encontra id referente a tarefa buscada na string
 buscar_id()
 {
   id_busca="$1"
   linha=$(sed -n "/^$id_busca/p; /^$id_busca/q" "$todo")
 }
 
+# exibe mensagem de uso como um mini manual
+uso()
+{
+  echo " Uso: tarefas.sh comando tarefa (--deadline <date> --prio <number>)"
+  echo "      tarefas.sh list (--deadline | --prio)"
+  echo "      tarefas list-done (--deadline | --prio)"
+  echo " "
+  echo "      Tente 'tarefas.sh -h' ou 'tarefas.sh --help' para ajuda"
+}
+
+ajuda()
+{
+  echo " Uso: tarefas.sh comando tarefa (--deadline <date> --prio <number>)"
+  echo "      tarefas.sh list (--deadline | --prio)"
+  echo "      tarefas list-done (--deadline | --prio)"
+  echo " "
+  echo " tarefas.sh é um script Bash para gerenciar uma lista de tarefas."
+  echo " "
+  echo " Comandos:"
+  echo "  add,      adiciona uma nova tarefa comum ou com deadline e/ou prioridade"
+  echo "  list,     lista ordenandamente todas as tarefas em deadline ou prioridade"
+  echo "  edit,     edita uma tarefa existente alterando deadline e/ou prioridade"
+  echo "  delete,   deleta uma tarefa existente a partir de seu identificador único"
+  echo "  do,       realiza uma tarefa, movendo para a lista as tarefas concluídas"
+  echo "  list-done lista todas as tarefas realizadas com data e hora da conclusão"
+  echo " "
+  echo " Ao usar 'tarefas.sh -h' ou 'tarefas.sh --help' estas informaçõe são exibidas."
+  echo " "
+  echo " Por padrão, tarefas.sh armazena seus arquivos de tarefas no diretório HOME."
+  echo " No entanto, isso pode ser alterado definindo a variável de ambiente TAREFAS_DIR:"
+  echo "    export TAREFAS_DIR=/caminho/para/o/seu/diretório/escolhido"
+}
+
+# função principal
 main()
 {
   # Salvando o comando e os argumentos da string
@@ -207,7 +242,7 @@ main()
 	shift
 	
   # Preparando o arquivo caso ele não exista
-	[ -f "$todo" ] || echo "TAREFAS:" > $todo
+	[ -f "$todo" ] || echo "TAREFAS:" > "$todo"
 	
   # opções de comandos para o usuário selecionar
 	case "$comando" in
@@ -235,8 +270,12 @@ main()
     list-done)
       list "$done"
       ;;
-      *)
+    -h|--help)
+      ajuda
+      ;;
+    *)
 			uso
+      ;;
 	esac
 }
 
