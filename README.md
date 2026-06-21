@@ -1,7 +1,7 @@
 # Lista de Tarefas do Terminal: `tarefas.sh`
 
 ### NOMES:
-ISAQUE CORTINA PIRES E
+ISAQUE CORTINA PIRES e
 LUIZ ANTONIO SCHIAVO BRUM
 
 ## Desenvolvimento
