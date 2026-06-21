@@ -44,22 +44,50 @@ add()
   echo "Tarefa $linha adicionada."
 }
 
-# ----------------------------------------------------------------
+#----------------------------------------------------------------------------------------
 
-# mostrar todas as tarefas (por padrão, ordena por identificador)
-list()
+selecionar_deadline()
 {
-  # mostrar todas as tarefas ordenando por data
-  echo "list"
-  # mostrar todas as tarefas ordenando por prioridade
+  grep -E "\([0-9]{8}\)" "$arquivo"
 }
 
+selecionar_prio()
+{
+  while IFS= read -r linha; do
+    [[ $linha =~ \+[0-9]+ ]] && echo "$linha"
+  done < "$arquivo" | sort -t'+' -k2,2nr
+}
+
+selecionar_simples() {
+  tail -n +2 "$arquivo" | while read -r linha; do
+    [[ $linha =~ \+[0-9]+ ]] && continue
+    [[ $linha =~ \([0-9]{8}\)$ ]] && continue
+    echo "$linha"
+  done
+}
+
+list() {
+  arquivo="$1"
+  
+  if [[ "$argumentos" == *"--deadline"* ]]; then
+    selecionar_deadline
+    selecionar_prio
+    selecionar_simples
+  elif [[ "$argumentos" == *"--prio"* ]]; then
+    selecionar_prio
+    selecionar_deadline
+    selecionar_simples
+  else
+    tail -n +2 "$arquivo"
+  fi
+}
+
+# ----------------------------------------------------------------
 edit()
 {
   # edita tarefa 1, adicionando prioridade
   echo "edit"
 }
-
 # -----------------------------------------------------------------
 
 # remove as linhas, podendo ser usada em outras funções subsequêntes
@@ -151,17 +179,22 @@ main()
       salvar_identificadores "$@"
 			add
 			;;
-		list|list-done)
-			list "$argumentos"
+		list)
+      #salvar_identificadores "$@" ########
+			list "$todo"
 			;;
 		edit)
-      edit "$@"
+      salvar_identificadores "$@"
+      edit
 			;;
 		delete)
-		  delete "$@"
+		  delete
 			;;
     do)
       do_tarefa
+      ;;
+    list-done)
+      list "$done"
       ;;
       *)
 			uso
