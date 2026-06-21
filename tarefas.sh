@@ -24,13 +24,15 @@ montar_tarefa() {
 
   # adiciona tarefa com data limite (obrigatório seguir o formato AAAAMMDD)
   if [ -n "$deadline" ]; then
+    [[ $deadline =~ ^[0-9]{8}$ ]] || die "use o formato AAAAMMDD (ex: 20260608)"
+
     # adiciona tarefa com data limite e prioridade (a prioridade padrão é 1)
     if [ -n "$prio" ]; then
       echo "$id: \"$tarefa\" ($deadline +$prio)"
     else
       echo "$id: \"$tarefa\" ($deadline)"
     fi
-  # adiciona tarefa somente com prioridade e por fim adiciona apenas a tarefa
+  # adiciona tarefa somente com prioridade e por fim, adiciona somente a tarefa
   elif [ -n "$prio" ]; then
     echo "$id: \"$tarefa\" (+$prio)"
   else
@@ -50,27 +52,31 @@ add()
   
   # preparando a string da linha para adicioná-la através do id
   id=$(wc -l < "$todo")
-  linha=$(montar_tarefa "$id")
+  linha=$(montar_tarefa "$id") || { echo "$linha"; exit 1; }
   
   # finalmente adicionando a linha
   echo "$linha" >> "$todo"
   echo "Tarefa $linha adicionada."
 }
 
-#----------------------------------------------------------------------------------------
-
+# seleciona apenas as linhas com deadline
 selecionar_deadline()
 {
-  grep -E "\([0-9]{8}\)" "$arquivo"
+  # mostra as linhas ordenadas com o padrão de 8 números
+  grep -E "\([0-9]{8}\)" "$arquivo" | sort -t'(' -k2,2n
 }
 
+# seleciona e ordena as linhas de acordo com a prioridade
 selecionar_prio()
 {
+  # busca o padrão e formata a saída ordenada
   while IFS= read -r linha; do
+    [[ $linha =~ \([0-9]{8}\) ]] && continue  # evitar duplas
     [[ $linha =~ \+[0-9]+ ]] && echo "$linha"
   done < "$arquivo" | sort -t'+' -k2,2nr
 }
 
+# seleciona somente linhas sem deadline e sem prioridade
 selecionar_simples() {
   tail -n +2 "$arquivo" | while read -r linha; do
     [[ $linha =~ \+[0-9]+ ]] && continue
@@ -79,29 +85,43 @@ selecionar_simples() {
   done
 }
 
+# mostrar todas as tarefas
 list() {
   arquivo="$1"
   
+  # mostrar todas as tarefas ordenando por data
   if [[ "$argumentos" == *"--deadline"* ]]; then
     selecionar_deadline
     selecionar_prio
     selecionar_simples
+
+  # mostrar todas as tarefas ordenando por prioridade
   elif [[ "$argumentos" == *"--prio"* ]]; then
     selecionar_prio
     selecionar_deadline
     selecionar_simples
   else
+    
+    # tarefas por padrão, ordena por identificador
     tail -n +2 "$arquivo"
   fi
 }
 
-# ----------------------------------------------------------------
+# edita tarefas, adicionando prioridade
 edit()
 {
-  # edita tarefa 1, adicionando prioridade
-  echo "edit"
+  # trata do caso de a tarefa não existir na lista
+  grep -q "^$id_busca:" "$todo" || die "Esta tarefa não existe..."
+  
+  # pega exatamente o nome da tarefa para colocá-lo na linha
+  tarefa=$(grep "^$id_busca:" "$todo" | sed -E 's/^[^"]*"([^"]*)".*$/\1/')
+  
+
+  # formata a linha e organiza os identificadores, erros são tratados
+  nova_linha=$(montar_tarefa "$id_busca") || { echo "$nova_linha"; exit 1; }
+  sed -i "s/^$id_busca:.*/$nova_linha/" "$todo" 
+  echo "Tarefa $nova_linha atualizada."
 }
-# -----------------------------------------------------------------
 
 # remove as linhas, podendo ser usada em outras funções subsequêntes
 remover_linha()
@@ -131,10 +151,10 @@ do_tarefa()
   # tratando o erros para a inexistência da tarefa buscada
   [ -n "$linha" ] || die "Esta tarefa não existe..."
   
-  # "movendo" a linha da listas de fazer para a lista de realizadas
+  # "movendo" tarefa para a lista de realizadas com data e hora
   echo "$linha" >> "$done"
   remover_linha "$todo"
-  echo "Tarefa $linha realizada."
+  echo "Tarefa $linha realizada em $(date +"%Y%m%d %H%M")."
 }
 
 # esta função serve para tratar da estética das strings de erros
@@ -170,6 +190,13 @@ uso()
   echo "USO..."
 }
 
+# encontra id referente a tarefa
+buscar_id()
+{
+  id_busca="$1"
+  linha=$(sed -n "/^$id_busca/p; /^$id_busca/q" "$todo")
+}
+
 main()
 {
   # Salvando o comando e os argumentos da string
@@ -179,13 +206,9 @@ main()
   # Pulando o comando para trabalhar nos argumentos
 	shift
 	
-  # Preparando o arquivo
+  # Preparando o arquivo caso ele não exista
 	[ -f "$todo" ] || echo "TAREFAS:" > $todo
 	
-  # id de busca algumas opções 
-  id_busca="$1"
-  linha=$(sed -n "/^$id_busca/p; /^$id_busca/q" "$todo")
-  
   # opções de comandos para o usuário selecionar
 	case "$comando" in
 		add)
@@ -193,17 +216,20 @@ main()
 			add
 			;;
 		list)
-      #salvar_identificadores "$@" ########
 			list "$todo"
 			;;
 		edit)
+      buscar_id "$1"
+      shift
       salvar_identificadores "$@"
       edit
 			;;
 		delete)
+      buscar_id "$1"
 		  delete
 			;;
     do)
+      buscar_id "$1"
       do_tarefa
       ;;
     list-done)
@@ -212,8 +238,7 @@ main()
       *)
 			uso
 	esac
-	
 }
 
-# iniciando a main se o comando for coerente com o uso
+# iniciando a main ou exibe mensagem de uso
 [ "$1" ] && main "$@" || uso
