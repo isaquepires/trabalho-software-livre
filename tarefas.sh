@@ -24,7 +24,7 @@ montar_tarefa() {
 
   # adiciona tarefa com data limite (obrigatório seguir o formato AAAAMMDD)
   if [ -n "$deadline" ]; then
-    [[ $deadline =~ ^[0-9]{8}$ ]] || die "use o formato AAAAMMDD (ex: 20260608)"
+    [[ $deadline =~ ^[0-9]{8}$ ]] || die "use o formato AAAAMMDD (ex: 20260608)."
 
     # adiciona tarefa com data limite e prioridade (a prioridade padrão é 1)
     if [ -n "$prio" ]; then
@@ -152,9 +152,9 @@ do_tarefa()
   [ -n "$linha" ] || die "Esta tarefa não existe..."
   
   # "movendo" tarefa para a lista de realizadas com data e hora
-  echo "$linha" >> "$done"
+  echo "$linha realizada em $(date +"%Y%m%d %H%M")." >> "$done"
   remover_linha "$todo"
-  echo "Tarefa $linha realizada em $(date +"%Y%m%d %H%M")."
+  echo "Tarefa $linha realizada."
 }
 
 # esta função serve para tratar da estética das strings de erros
